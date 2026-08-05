@@ -1,0 +1,20 @@
+{
+  "court_lower_hsv": [90, 55, 45],
+  "court_upper_hsv": [145, 255, 255],
+  "court_min_area_ratio": 0.12,
+  "court_cache_frames": 8,
+  "canonical_width": 600,
+  "canonical_height": 360,
+  "motion_history": 90,
+  "motion_threshold": 24,
+  "morphology_kernel": 3,
+  "player_min_area_ratio": 0.0008,
+  "player_max_area_ratio": 0.08,
+  "player_min_height_ratio": 0.045,
+  "ball_min_area_ratio": 0.00001,
+  "ball_max_area_ratio": 0.0012,
+  "ball_min_circularity": 0.32,
+  "track_smoothing": 0.35,
+  "track_max_jump": 0.35,
+  "track_max_missing": 12
+}
