@@ -12,6 +12,11 @@ The original 1,352-line script is preserved in
 [`legacy/tennis_tracker_monolith.py`](legacy/tennis_tracker_monolith.py) for
 provenance; it is no longer imported by the application.
 
+![Synthetic tennis tracking demo](docs/assets/demo-preview.jpg)
+
+_Generated integration scene: court geometry, two player tracks, and ball tracking.
+No real match footage is included._
+
 ## What it demonstrates
 
 - HSV court segmentation with cached-court recovery during brief occlusions
