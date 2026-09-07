@@ -1,5 +1,3 @@
-"""Backward-compatible entry point for the repaired tennis vision application."""
-
 from tennis_vision.cli import main
 
 if __name__ == "__main__":

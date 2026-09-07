@@ -1,201 +1,133 @@
-# Tennis Match Video Analysis with Classical Computer Vision
+# Tennis Vision Lab
 
-A video-processing project that detects the tennis court, estimates player and ball locations, rectifies the camera view, and projects the tracked objects onto a top-down tennis-court representation.
+[![CI](https://github.com/cagataykavas/tennisGameProcessing/actions/workflows/ci.yml/badge.svg)](https://github.com/cagataykavas/tennisGameProcessing/actions/workflows/ci.yml)
 
-The implementation uses **OpenCV, NumPy and SciPy** with handcrafted image-processing and geometric heuristics rather than a pretrained object detector.
+An explainable, classical-computer-vision baseline for locating a tennis court,
+tracking two players and a ball, and exporting every decision as machine-readable
+JSON. It runs headlessly, includes a deterministic synthetic demo, and does not
+require a bundled match video or a pretrained model.
 
-> This repository is an academic computer-vision project. The thresholds and assumptions are tuned to the project footage and should be understood as a classical-CV experiment rather than a production sports-tracking system.
+This repository is a production-minded repair of an earlier university prototype.
+The original 1,352-line script is preserved in
+[`legacy/tennis_tracker_monolith.py`](legacy/tennis_tracker_monolith.py) for
+provenance; it is no longer imported by the application.
 
-## Project goals
+![Synthetic tennis tracking demo](docs/assets/demo-preview.jpg)
 
-The pipeline attempts to answer several problems from a single tennis video:
+_Generated integration scene: court geometry, two player tracks, and ball tracking.
+No real match footage is included._
 
-- determine whether the match/court is currently visible;
-- locate the tennis court in the camera image;
-- rectify the perspective view of the court;
-- detect and distinguish player-sized and ball-sized moving regions;
-- maintain short temporal histories for tracked objects;
-- map detected positions from camera coordinates to a top-down court representation;
-- visualise player and ball positions on `tennis_court.png`;
-- optionally display movement paths and detection attributes;
-- save processed output video.
+## What it demonstrates
 
-## Processing pipeline
+- HSV court segmentation with cached-court recovery during brief occlusions
+- Perspective rectification into a canonical 600 x 360 court
+- Motion-based player and ball candidates with explicit heuristic evidence
+- Stable `player_far`, `player_near`, and `ball_1` track identities
+- Annotated video, a preview image, JSONL frame events, and a run summary
+- Import-safe modules, typed configuration, tests, and headless CI
 
-At a high level:
+The detector is intentionally a transparent baseline, not a claim of modern
+player/ball detection accuracy. Reported run metrics are processing and detection
+counts—not fabricated precision or recall.
 
-```text
-Input tennis video
-        │
-        ▼
-Court / scene analysis
-        │
-        ▼
-Court geometry estimation
-        │
-        ▼
-Perspective rectification
-        │
-        ▼
-Foreground / contour extraction
-        │
-        ├──► player candidates
-        │
-        └──► ball candidates
-        │
-        ▼
-Temporal association / filtering
-        │
-        ▼
-Coordinate transformation
-        │
-        ▼
-Top-down court visualisation
-```
-
-## Techniques demonstrated
-
-- Video processing with OpenCV
-- Color-based court analysis
-- Thresholding and foreground segmentation
-- Contour extraction
-- Contour grouping
-- Area and aspect-ratio classification
-- Morphological processing
-- Perspective transformation / court rectification
-- Player and ball candidate filtering
-- Spatial-distance calculations
-- Temporal position history with `deque`
-- Mapping image-space positions to a court diagram
-- OpenCV and Matplotlib visualisation
-- Video export
-
-## Repository structure
-
-```text
-tennisGameProcessing/
-├── project.py           # Complete processing pipeline
-├── tennis_court.png     # Top-down court visualisation asset
-├── requirements.txt     # Python dependencies
-├── ReadMe.txt           # Original project notes
-└── README.md            # Project documentation
-```
-
-The source video is expected in the repository root as:
-
-```text
-tennis.mp4
-```
-
-The video itself is not included in the repository.
-
-## Installation
-
-Python 3 is required.
+## Quick start
 
 ```bash
 python -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+
+# Generates its own tennis scene and exercises the full pipeline.
+tennis-vision demo --output artifacts/demo --frames 90
+
+# Analyze a real recording.
+tennis-vision analyze --input tennis.mp4 --output artifacts/match
+
+# Print the JSON contract without running video processing.
+tennis-vision explain-schema
 ```
 
-Activate the environment and install the project dependencies:
+The historical entry point remains useful:
 
 ```bash
-pip install -r requirements.txt
+python project.py demo --output artifacts/demo
 ```
 
-## Running
+## Outputs
 
-Place `tennis.mp4` in the project directory and run:
+Each run creates:
 
-```bash
-python project.py
+| File | Purpose |
+|---|---|
+| `events.jsonl` | One explainable event per processed frame |
+| `summary.json` | Input metadata, timing, and observed detection counts |
+| `annotated.mp4` | Court polygon, track IDs, and current positions |
+| `preview.jpg` | Final annotated frame for quick inspection |
+
+Example event fragment:
+
+```json
+{
+  "schema_version": "1.0",
+  "frame_index": 18,
+  "court": {
+    "visible": true,
+    "source": "observed",
+    "confidence": 0.94
+  },
+  "detections": [
+    {
+      "track_id": "ball_1",
+      "label": "ball",
+      "confidence": 0.81,
+      "court_position": {"x": 0.52, "y": 0.43},
+      "evidence": {
+        "decision_rule": "small_compact_motion",
+        "area_px": 96.0,
+        "circularity": 0.79
+      }
+    }
+  ]
+}
 ```
 
-The script opens its configured visualisation windows and writes processed video output to:
-
-```text
-output.avi
-```
+See [the architecture guide](docs/architecture.md) and
+[the JSON contract](docs/json-contract.md) for details.
 
 ## Configuration
 
-Most detection behaviour is controlled through the `params` dictionary near the beginning of `project.py`.
+Copy [`config.example.json`](config.example.json), change only the thresholds you
+need, and pass it to either command:
 
-It contains thresholds and switches for:
-
-- player minimum / maximum area;
-- player aspect ratio;
-- ball minimum / maximum area;
-- ball aspect ratio;
-- contour grouping distance;
-- morphology / dilation;
-- court color ratio;
-- court size and aspect-ratio limits;
-- perspective expansion;
-- player and ball search radii;
-- ball circularity checking;
-- tracking-history length;
-- visualisation windows and movement paths.
-
-Keeping these parameters together makes the assumptions of the handcrafted detector explicit and allows the behaviour to be tuned for different footage.
-
-## Court representation
-
-The project uses the standard court dimensions encoded in the source:
-
-```text
-Length: 78 ft
-Doubles width: 36 ft
+```bash
+tennis-vision analyze \
+  --input tennis.mp4 \
+  --output artifacts/match \
+  --config config.example.json \
+  --max-frames 500
 ```
 
-The supplied `tennis_court.png` is used as a top-down representation. Detected player and ball positions can be transformed from the camera / rectified image into this court coordinate system and rendered as markers.
+Unknown configuration keys and invalid ranges fail fast. This keeps experiments
+reproducible and catches misspelled options.
 
-This is the most interesting part of the project from a geometry perspective: detections are not only drawn on the original video, but interpreted relative to the physical playing surface.
+## Development
 
-## Player and ball candidates
+```bash
+pip install -e ".[dev]"
+pytest
+python -m compileall tennis_vision project.py
+```
 
-Candidate moving regions are represented by contours and bounding boxes. The code uses configurable area and width/height constraints to distinguish likely player-sized regions from ball-sized regions.
+## Limitations and next experiments
 
-Nearby contours can be grouped before classification, which is useful because foreground segmentation may split a player into several disconnected regions.
+- Blue-court HSV defaults need tuning for clay, grass, and indoor lighting.
+- Motion segmentation struggles with a moving camera and stationary players.
+- Very small balls can disappear after video compression.
+- A learned detector can replace `MotionObjectDetector` while preserving the same
+  JSON contract, tracker, CLI, and evaluation harness.
 
-The player grouping logic also uses the player's location relative to the two halves of the court.
+No private footage, proprietary model weights, or third-party dataset is included.
 
-Ball candidates use tighter size/aspect-ratio constraints, optional circularity checks, search-radius restrictions and temporal history to reduce false positives.
+## License
 
-## Visualisation
-
-Depending on the configured flags, the project can show:
-
-- the original video;
-- the rectified tennis-court view;
-- player bounding boxes;
-- ball detections and attributes;
-- movement histories;
-- player/ball markers on the top-down court image.
-
-This makes the project useful for inspecting each stage of the image-processing pipeline rather than exposing only a final result.
-
-## Limitations
-
-The detector is intentionally heuristic and footage-specific.
-
-Important limitations include:
-
-- fixed thresholds depend strongly on resolution, lighting and camera position;
-- color-based court detection assumes a visually distinctive court;
-- contour-based player/ball classification can be confused by shadows and background motion;
-- a tennis ball occupies very few pixels and is difficult to track reliably with simple segmentation;
-- camera cuts, zooms or significant camera motion can invalidate geometric assumptions;
-- occlusion can disrupt player or ball association;
-- many parameters were tuned experimentally for the original project video;
-- the current implementation is a large single-file research/assignment prototype rather than a packaged library.
-
-## Possible extensions
-
-A modern version could combine this geometry pipeline with learned player/ball detectors, Kalman filtering, court-keypoint models, trajectory smoothing, bounce detection, shot classification and quantitative tracking metrics.
-
-The existing implementation remains useful as a **classical-computer-vision baseline** because the detection and geometry decisions are visible and inspectable rather than hidden inside a neural model.
-
-## Why this project is useful
-
-This repository demonstrates considerably more than basic object detection. It combines scene understanding, handcrafted segmentation, object classification, perspective geometry, temporal tracking and coordinate mapping into an end-to-end sports-video analysis pipeline.
+MIT
